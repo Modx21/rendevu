@@ -9,14 +9,23 @@
     href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
     rel="stylesheet"
   >
+  <!-- Bootstrap Icons (form ikonları için) -->
+  <link
+    href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css"
+    rel="stylesheet"
+  >
   <style>
     body { background-color: #f5f5f5; }
 
     .admin-panel { display: none; }
 
-    /* Açılış (hero) alanı */
+    /* Navbar ve hero renkleri */
+    .navbar-custom {
+      background-color: #020617; /* çok koyu, soft lacivert */
+    }
+
     .hero-section {
-      background: linear-gradient(135deg, #0d6efd, #6610f2);
+      background: linear-gradient(135deg, #020617, #0f172a);
       color: #fff;
       padding: 3rem 1rem;
       text-align: center;
@@ -49,9 +58,13 @@
 
     /* Saat kutuları */
     .slot-btn {
-      min-width: 72px;
-      margin-bottom: 0.25rem;
+      min-width: 96px;
+      min-height: 56px;
+      margin-bottom: 0.3rem;
       font-size: 0.85rem;
+      line-height: 1.1;
+      white-space: normal;
+      padding: 0.35rem 0.5rem;
     }
     .slot-free {
       background-color: #e9ecef;
@@ -64,12 +77,12 @@
       color: #fff;
     }
     .slot-selected {
-      box-shadow: 0 0 0 0.15rem rgba(13,110,253,.5);
+      box-shadow: 0 0 0 0.15rem rgba(13,110,253,.6);
     }
   </style>
 </head>
 <body>
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-0">
+<nav class="navbar navbar-expand-lg navbar-dark navbar-custom mb-0">
   <div class="container">
     <a class="navbar-brand" href="#">Mücahit Onur Diril</a>
     <button class="btn btn-sm btn-outline-light ms-auto" id="adminToggleBtn">
@@ -117,35 +130,44 @@
 
           <form id="appointmentForm">
             <div class="mb-3">
-              <label class="form-label">Ad Soyad *</label>
+              <label class="form-label">
+                <i class="bi bi-person-circle me-1"></i>Ad Soyad *
+              </label>
               <input type="text" name="name" class="form-control" required>
             </div>
 
             <div class="mb-3">
-              <label class="form-label">İletişim Bilgisi (Telefon / E-posta)</label>
+              <label class="form-label">
+                <i class="bi bi-telephone-forward me-1"></i>İletişim Bilgisi (Telefon / E-posta)
+              </label>
               <input type="text" name="contact" class="form-control" placeholder="Opsiyonel">
             </div>
 
             <!-- Gün & saat seçim takvimi -->
             <div class="mb-3">
-              <label class="form-label">Gün ve Saat Seçimi *</label>
+              <label class="form-label">
+                <i class="bi bi-calendar-week me-1"></i>Gün ve Saat Seçimi *
+              </label>
               <div class="d-flex justify-content-between align-items-center mb-2">
                 <button type="button" class="btn btn-sm btn-outline-secondary" id="prevDayBtn">&lt;</button>
                 <div id="dayLabel" class="fw-semibold"></div>
                 <button type="button" class="btn btn-sm btn-outline-secondary" id="nextDayBtn">&gt;</button>
               </div>
               <div id="slotsContainer" class="d-flex flex-wrap gap-2"></div>
+              <!-- Eski hidden inputlar, geriye dönük uyumluluk için bırakıldı -->
               <input type="hidden" name="date" id="selectedDateInput">
               <input type="hidden" name="start_time" id="selectedStartInput">
               <input type="hidden" name="end_time" id="selectedEndInput">
               <div class="form-text">
                 Hafta içi 17:00–01:00, hafta sonu 09:00–01:00 arası randevu alınabilir.
-                <br>Boş saatler gri, dolu saatler yeşildir. Saat seçmek için kutuya tıklayın.
+                <br>Boş saatler gri, onaylanmış randevular yeşildir. Seçmek için gri saat kutularına dokunabilirsiniz (çoklu seçim yapılabilir).
               </div>
             </div>
 
             <div class="mb-3">
-              <label class="form-label">Nedeni *</label>
+              <label class="form-label">
+                <i class="bi bi-chat-left-dots me-1"></i>Nedeni *
+              </label>
               <select name="reason" class="form-select" required>
                 <option value="">Seçiniz...</option>
                 <option>ÇAY</option>
@@ -154,12 +176,15 @@
                 <option>GEZME</option>
                 <option>PİKNİK</option>
                 <option>TATLI</option>
+                <option>İŞ / WORK</option>
                 <option>DİĞER</option>
               </select>
             </div>
 
             <div class="mb-3">
-              <label class="form-label">Not (Opsiyonel)</label>
+              <label class="form-label">
+                <i class="bi bi-pencil-square me-1"></i>Not (Opsiyonel)
+              </label>
               <textarea name="note" class="form-control" rows="3"
                         placeholder="Örn: Nerede buluşalım, ekstra notlar..."></textarea>
             </div>
@@ -222,7 +247,7 @@
 <script>
   // Basit "veritabanı": localStorage
   const STORAGE_KEY = "randevu_kayitlari_v1";
-  const ADMIN_PASSWORD = "1234"; // Bunu kendine göre değiştir
+  const ADMIN_PASSWORD = "242935"; // Yeni admin şifresi
 
   function loadAppointments() {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -262,14 +287,15 @@
     }
   }
 
+  // Sadece ONAYLANMIŞ randevular haritaya girsin ve tür bilgisini tutsun
   function getOccupiedMap() {
     const list = loadAppointments();
     const map = {};
     for (const a of list) {
-      if (a.status === "rejected") continue;
+      if (a.status !== "approved") continue; // sadece approved
       if (!a.date || !a.start_time) continue;
       const key = a.date + "T" + a.start_time;
-      map[key] = true;
+      map[key] = a.reason || "DOLU";
     }
     return map;
   }
@@ -290,14 +316,14 @@
   const dayLabel = document.getElementById("dayLabel");
   const slotsContainer = document.getElementById("slotsContainer");
   const selectedDateInput = document.getElementById("selectedDateInput");
-  const selectedStartInput = document.getElementById("selectedStartInput");
-  const selectedEndInput = document.getElementById("selectedEndInput");
 
   let currentDate = new Date();
   currentDate.setHours(0,0,0,0);
-  let selectedSlotTime = null;
 
   const dayNames = ["Pazar","Pazartesi","Salı","Çarşamba","Perşembe","Cuma","Cumartesi"];
+
+  // Aynı gün içinde çoklu slot seçimi için
+  let selectedSlots = new Set();
 
   function isWeekend(date) {
     const d = date.getDay();
@@ -312,7 +338,7 @@
   function nextHourStr(timeStr) {
     const [h, m] = timeStr.split(":").map(Number);
     let h2 = (h + 1) % 24;
-    return h2.toString().padStart(2, "0") + ":" + "00";
+    return h2.toString().padStart(2, "0") + ":00";
   }
 
   function getSlotsForDate(date) {
@@ -339,30 +365,36 @@
     const slots = getSlotsForDate(currentDate);
 
     slotsContainer.innerHTML = "";
-    selectedSlotTime = null;
-    selectedStartInput.value = "";
-    selectedEndInput.value = "";
+    // Gün değişince seçimleri sıfırla
+    selectedSlots = new Set();
 
     for (const time of slots) {
       const key = dateStr + "T" + time;
-      const isBusy = !!occupiedMap[key];
+      const reasonText = occupiedMap[key];
+      const isBusy = !!reasonText;
 
       const btn = document.createElement("button");
       btn.type = "button";
-      btn.textContent = time;
-      btn.className = "btn btn-sm slot-btn";
+      btn.className = "btn slot-btn";
 
       if (isBusy) {
+        // Dolu slot: yeşil + tür
         btn.classList.add("slot-busy");
         btn.disabled = true;
+        btn.innerHTML = `${time}<br><small>${reasonText}</small>`;
       } else {
+        // Boş slot: gri ve çoklu seçime uygun
         btn.classList.add("slot-free");
+        btn.textContent = time;
+
         btn.addEventListener("click", () => {
-          selectedSlotTime = time;
-          selectedStartInput.value = time;
-          selectedEndInput.value = nextHourStr(time);
-          document.querySelectorAll(".slot-btn").forEach(b => b.classList.remove("slot-selected"));
-          btn.classList.add("slot-selected");
+          if (selectedSlots.has(time)) {
+            selectedSlots.delete(time);
+            btn.classList.remove("slot-selected");
+          } else {
+            selectedSlots.add(time);
+            btn.classList.add("slot-selected");
+          }
         });
       }
 
@@ -375,7 +407,7 @@
     today.setHours(0,0,0,0);
     const newDate = new Date(currentDate);
     newDate.setDate(currentDate.getDate() - 1);
-    // İstersen geçmişe randevu alınmasın diye bugünden öncesini engelliyoruz
+    // geçmiş tarihlere izin verme
     if (newDate < today) return;
     currentDate = newDate;
     renderDay();
@@ -394,26 +426,40 @@
     e.preventDefault();
     const formData = new FormData(form);
 
-    const data = {
+    const baseData = {
       name: formData.get("name").trim(),
       contact: formData.get("contact").trim(),
       date: selectedDateInput.value,
-      start_time: selectedStartInput.value,
-      end_time: selectedEndInput.value,
       reason: formData.get("reason"),
       note: formData.get("note").trim()
     };
 
-    if (!data.name || !data.date || !data.start_time || !data.end_time || !data.reason) {
-      showAlert("Lütfen tüm zorunlu alanları ve bir saat dilimini seçin.", "danger");
+    if (!baseData.name || !baseData.date || !baseData.reason) {
+      showAlert("Lütfen ad, gün ve nedeni doldurun.", "danger");
       return;
     }
 
-    addAppointment(data);
+    if (selectedSlots.size === 0) {
+      showAlert("Lütfen en az bir saat dilimi seçin.", "danger");
+      return;
+    }
+
+    // Seçili her slot için ayrı randevu kaydı oluştur
+    const times = Array.from(selectedSlots).sort();
+    for (const time of times) {
+      const data = {
+        ...baseData,
+        start_time: time,
+        end_time: nextHourStr(time)
+      };
+      addAppointment(data);
+    }
+
     form.reset();
-    // Seçili slot işareti kalsın istiyorsan burayı değiştirebilirsin
+    // Seçimler temizlensin
+    selectedSlots = new Set();
     renderDay();
-    showAlert("Randevu talebiniz alındı. Onaylandığında size haber verilecektir.", "success");
+    showAlert("Randevu talebiniz alındı. Onaylanan saatler takvimde yeşil görünecektir.", "success");
   });
 
   // Admin paneli
@@ -471,7 +517,7 @@
         const id = parseInt(btn.getAttribute("data-id"));
         updateAppointmentStatus(id, "approved");
         renderAppointments(currentFilter);
-        renderDay(); // takvimde yeşile dönsün
+        renderDay(); // takvimi de güncelle
       });
     });
     document.querySelectorAll(".reject-btn").forEach(btn => {
@@ -511,4 +557,4 @@
 </script>
 
 </body>
-</html>
+  </html>
