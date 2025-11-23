@@ -9,7 +9,7 @@
     href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
     rel="stylesheet"
   >
-  <!-- Bootstrap Icons (form ikonları için) -->
+  <!-- Bootstrap Icons -->
   <link
     href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css"
     rel="stylesheet"
@@ -17,11 +17,9 @@
   <style>
     body { background-color: #f5f5f5; }
 
-    .admin-panel { display: none; }
-
     /* Navbar ve hero renkleri */
     .navbar-custom {
-      background-color: #020617; /* çok koyu, soft lacivert */
+      background-color: #020617; /* koyu, soft lacivert */
     }
 
     .hero-section {
@@ -85,9 +83,8 @@
 <nav class="navbar navbar-expand-lg navbar-dark navbar-custom mb-0">
   <div class="container">
     <a class="navbar-brand" href="#">Mücahit Onur Diril</a>
-    <button class="btn btn-sm btn-outline-light ms-auto" id="adminToggleBtn">
-      Admin Girişi
-    </button>
+    <!-- Admin sayfasına link (şifre admin.html içinde sorulacak) -->
+    <a href="admin.html" class="btn btn-sm btn-outline-light ms-auto">Admin</a>
   </div>
 </nav>
 
@@ -154,10 +151,7 @@
                 <button type="button" class="btn btn-sm btn-outline-secondary" id="nextDayBtn">&gt;</button>
               </div>
               <div id="slotsContainer" class="d-flex flex-wrap gap-2"></div>
-              <!-- Eski hidden inputlar, geriye dönük uyumluluk için bırakıldı -->
               <input type="hidden" name="date" id="selectedDateInput">
-              <input type="hidden" name="start_time" id="selectedStartInput">
-              <input type="hidden" name="end_time" id="selectedEndInput">
               <div class="form-text">
                 Hafta içi 17:00–01:00, hafta sonu 09:00–01:00 arası randevu alınabilir.
                 <br>Boş saatler gri, onaylanmış randevular yeşildir. Seçmek için gri saat kutularına dokunabilirsiniz (çoklu seçim yapılabilir).
@@ -198,56 +192,13 @@
     </div>
   </section>
 
-  <!-- Admin Paneli -->
-  <div class="admin-panel" id="adminPanel">
-    <div class="card shadow-sm">
-      <div class="card-body">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-          <h2 class="h5 mb-0">Admin Paneli</h2>
-          <button class="btn btn-sm btn-outline-secondary" id="adminLogoutBtn">Çıkış</button>
-        </div>
-
-        <div class="mb-3">
-          <span class="me-2">Filtre:</span>
-          <button class="btn btn-sm btn-outline-primary me-1 status-filter" data-status="pending">Bekleyenler</button>
-          <button class="btn btn-sm btn-outline-success me-1 status-filter" data-status="approved">Onaylananlar</button>
-          <button class="btn btn-sm btn-outline-danger me-1 status-filter" data-status="rejected">Reddedilenler</button>
-          <button class="btn btn-sm btn-outline-secondary status-filter" data-status="all">Tümü</button>
-        </div>
-
-        <div class="table-responsive">
-          <table class="table table-sm table-striped align-middle">
-            <thead>
-            <tr>
-              <th>#</th>
-              <th>Tarih</th>
-              <th>Saat</th>
-              <th>Ad Soyad</th>
-              <th>İletişim</th>
-              <th>Neden</th>
-              <th>Not</th>
-              <th>Durum</th>
-              <th>İşlem</th>
-            </tr>
-            </thead>
-            <tbody id="appointmentsTableBody">
-            <!-- JS ile doldurulacak -->
-            </tbody>
-          </table>
-        </div>
-
-      </div>
-    </div>
-  </div>
-
 </div>
 
 <!-- Bootstrap JS -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-  // Basit "veritabanı": localStorage
+  // Aynı key'i admin sayfasıyla paylaşıyoruz
   const STORAGE_KEY = "randevu_kayitlari_v1";
-  const ADMIN_PASSWORD = "242935"; // Yeni admin şifresi
 
   function loadAppointments() {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -276,15 +227,6 @@
     });
     saveAppointments(list);
     return id;
-  }
-
-  function updateAppointmentStatus(id, newStatus) {
-    const list = loadAppointments();
-    const idx = list.findIndex(item => item.id === id);
-    if (idx !== -1) {
-      list[idx].status = newStatus;
-      saveAppointments(list);
-    }
   }
 
   // Sadece ONAYLANMIŞ randevular haritaya girsin ve tür bilgisini tutsun
@@ -316,6 +258,7 @@
   const dayLabel = document.getElementById("dayLabel");
   const slotsContainer = document.getElementById("slotsContainer");
   const selectedDateInput = document.getElementById("selectedDateInput");
+  const formSection = document.getElementById("randevu-formu");
 
   let currentDate = new Date();
   currentDate.setHours(0,0,0,0);
@@ -436,11 +379,13 @@
 
     if (!baseData.name || !baseData.date || !baseData.reason) {
       showAlert("Lütfen ad, gün ve nedeni doldurun.", "danger");
+      formSection.scrollIntoView({behavior: "smooth"});
       return;
     }
 
     if (selectedSlots.size === 0) {
       showAlert("Lütfen en az bir saat dilimi seçin.", "danger");
+      formSection.scrollIntoView({behavior: "smooth"});
       return;
     }
 
@@ -456,100 +401,11 @@
     }
 
     form.reset();
-    // Seçimler temizlensin
     selectedSlots = new Set();
     renderDay();
-    showAlert("Randevu talebiniz alındı. Onaylanan saatler takvimde yeşil görünecektir.", "success");
-  });
-
-  // Admin paneli
-  const adminToggleBtn = document.getElementById("adminToggleBtn");
-  const adminPanel = document.getElementById("adminPanel");
-  const adminLogoutBtn = document.getElementById("adminLogoutBtn");
-  const appointmentsTableBody = document.getElementById("appointmentsTableBody");
-  let currentFilter = "pending";
-
-  function renderAppointments(filterStatus) {
-    const list = loadAppointments();
-    let filtered = list;
-    if (filterStatus !== "all") {
-      filtered = list.filter(item => item.status === filterStatus);
-    }
-    appointmentsTableBody.innerHTML = "";
-    if (!filtered.length) {
-      appointmentsTableBody.innerHTML = `<tr><td colspan="9" class="text-center text-muted">Kayıt bulunamadı.</td></tr>`;
-      return;
-    }
-
-    for (const a of filtered) {
-      let badgeClass = "bg-warning text-dark";
-      let badgeText = "Beklemede";
-      if (a.status === "approved") {
-        badgeClass = "bg-success";
-        badgeText = "Onaylandı";
-      } else if (a.status === "rejected") {
-        badgeClass = "bg-danger";
-        badgeText = "Reddedildi";
-      }
-
-      const row = document.createElement("tr");
-      row.innerHTML = `
-        <td>${a.id}</td>
-        <td>${a.date}</td>
-        <td>${a.start_time} - ${a.end_time}</td>
-        <td>${a.name}</td>
-        <td>${a.contact || ""}</td>
-        <td>${a.reason}</td>
-        <td style="max-width:250px;">${a.note || ""}</td>
-        <td><span class="badge ${badgeClass}">${badgeText}</span></td>
-        <td>
-          <div class="d-flex gap-1">
-            ${a.status !== "approved" ? `<button class="btn btn-sm btn-success approve-btn" data-id="${a.id}">Onayla</button>` : ""}
-            ${a.status !== "rejected" ? `<button class="btn btn-sm btn-outline-danger reject-btn" data-id="${a.id}">Reddet</button>` : ""}
-          </div>
-        </td>
-      `;
-      appointmentsTableBody.appendChild(row);
-    }
-
-    document.querySelectorAll(".approve-btn").forEach(btn => {
-      btn.addEventListener("click", () => {
-        const id = parseInt(btn.getAttribute("data-id"));
-        updateAppointmentStatus(id, "approved");
-        renderAppointments(currentFilter);
-        renderDay(); // takvimi de güncelle
-      });
-    });
-    document.querySelectorAll(".reject-btn").forEach(btn => {
-      btn.addEventListener("click", () => {
-        const id = parseInt(btn.getAttribute("data-id"));
-        updateAppointmentStatus(id, "rejected");
-        renderAppointments(currentFilter);
-        renderDay();
-      });
-    });
-  }
-
-  adminToggleBtn.addEventListener("click", () => {
-    const pass = prompt("Admin şifresini giriniz:");
-    if (pass === ADMIN_PASSWORD) {
-      adminPanel.style.display = "block";
-      currentFilter = "pending";
-      renderAppointments(currentFilter);
-    } else if (pass !== null) {
-      alert("Hatalı şifre!");
-    }
-  });
-
-  adminLogoutBtn.addEventListener("click", () => {
-    adminPanel.style.display = "none";
-  });
-
-  document.querySelectorAll(".status-filter").forEach(btn => {
-    btn.addEventListener("click", () => {
-      currentFilter = btn.getAttribute("data-status");
-      renderAppointments(currentFilter);
-    });
+    showAlert("Randevu talebiniz alındı. Onaylandığında ilgili saatler takvimde yeşil görünecektir.", "success");
+    // Uyarıya doğru ekranı kaydır
+    formSection.scrollIntoView({behavior: "smooth"});
   });
 
   // Sayfa yüklenince bugünden başla
@@ -557,4 +413,4 @@
 </script>
 
 </body>
-  </html>
+                </html>
