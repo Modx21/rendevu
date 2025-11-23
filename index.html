@@ -46,6 +46,26 @@
       max-width: 620px;
       margin: 0 auto 2rem auto;
     }
+
+    /* Saat kutuları */
+    .slot-btn {
+      min-width: 72px;
+      margin-bottom: 0.25rem;
+      font-size: 0.85rem;
+    }
+    .slot-free {
+      background-color: #e9ecef;
+      color: #212529;
+      border-color: #ced4da;
+    }
+    .slot-busy {
+      background-color: #198754;
+      border-color: #198754;
+      color: #fff;
+    }
+    .slot-selected {
+      box-shadow: 0 0 0 0.15rem rgba(13,110,253,.5);
+    }
   </style>
 </head>
 <body>
@@ -106,19 +126,21 @@
               <input type="text" name="contact" class="form-control" placeholder="Opsiyonel">
             </div>
 
+            <!-- Gün & saat seçim takvimi -->
             <div class="mb-3">
-              <label class="form-label">Tarih *</label>
-              <input type="date" name="date" class="form-control" required>
-            </div>
-
-            <div class="row">
-              <div class="col-md-6 mb-3">
-                <label class="form-label">Başlangıç Saati *</label>
-                <input type="time" name="start_time" class="form-control" required>
+              <label class="form-label">Gün ve Saat Seçimi *</label>
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="prevDayBtn">&lt;</button>
+                <div id="dayLabel" class="fw-semibold"></div>
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="nextDayBtn">&gt;</button>
               </div>
-              <div class="col-md-6 mb-3">
-                <label class="form-label">Bitiş Saati *</label>
-                <input type="time" name="end_time" class="form-control" required>
+              <div id="slotsContainer" class="d-flex flex-wrap gap-2"></div>
+              <input type="hidden" name="date" id="selectedDateInput">
+              <input type="hidden" name="start_time" id="selectedStartInput">
+              <input type="hidden" name="end_time" id="selectedEndInput">
+              <div class="form-text">
+                Hafta içi 17:00–01:00, hafta sonu 09:00–01:00 arası randevu alınabilir.
+                <br>Boş saatler gri, dolu saatler yeşildir. Saat seçmek için kutuya tıklayın.
               </div>
             </div>
 
@@ -240,6 +262,18 @@
     }
   }
 
+  function getOccupiedMap() {
+    const list = loadAppointments();
+    const map = {};
+    for (const a of list) {
+      if (a.status === "rejected") continue;
+      if (!a.date || !a.start_time) continue;
+      const key = a.date + "T" + a.start_time;
+      map[key] = true;
+    }
+    return map;
+  }
+
   function showAlert(message, type="success") {
     const alertDiv = document.getElementById("formAlert");
     alertDiv.innerHTML = `
@@ -250,6 +284,110 @@
     `;
   }
 
+  // === Gün & saat takvimi ===
+  const prevDayBtn = document.getElementById("prevDayBtn");
+  const nextDayBtn = document.getElementById("nextDayBtn");
+  const dayLabel = document.getElementById("dayLabel");
+  const slotsContainer = document.getElementById("slotsContainer");
+  const selectedDateInput = document.getElementById("selectedDateInput");
+  const selectedStartInput = document.getElementById("selectedStartInput");
+  const selectedEndInput = document.getElementById("selectedEndInput");
+
+  let currentDate = new Date();
+  currentDate.setHours(0,0,0,0);
+  let selectedSlotTime = null;
+
+  const dayNames = ["Pazar","Pazartesi","Salı","Çarşamba","Perşembe","Cuma","Cumartesi"];
+
+  function isWeekend(date) {
+    const d = date.getDay();
+    return d === 0 || d === 6; // Pazar veya Cumartesi
+  }
+
+  function formatHour(h) {
+    const hh = h.toString().padStart(2, "0");
+    return hh + ":00";
+  }
+
+  function nextHourStr(timeStr) {
+    const [h, m] = timeStr.split(":").map(Number);
+    let h2 = (h + 1) % 24;
+    return h2.toString().padStart(2, "0") + ":" + "00";
+  }
+
+  function getSlotsForDate(date) {
+    const weekend = isWeekend(date);
+    const times = [];
+    const start = weekend ? 9 : 17; // Hafta sonu 09, hafta içi 17
+    for (let h = start; h <= 23; h++) {
+      times.push(formatHour(h));
+    }
+    // Gece 00:00 slotu (00:00-01:00)
+    times.push("00:00");
+    return times;
+  }
+
+  function renderDay() {
+    const dateStr = currentDate.toISOString().slice(0,10);
+    selectedDateInput.value = dateStr;
+
+    const labelText = dayNames[currentDate.getDay()] + " - " +
+      currentDate.toLocaleDateString("tr-TR");
+    dayLabel.textContent = labelText;
+
+    const occupiedMap = getOccupiedMap();
+    const slots = getSlotsForDate(currentDate);
+
+    slotsContainer.innerHTML = "";
+    selectedSlotTime = null;
+    selectedStartInput.value = "";
+    selectedEndInput.value = "";
+
+    for (const time of slots) {
+      const key = dateStr + "T" + time;
+      const isBusy = !!occupiedMap[key];
+
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.textContent = time;
+      btn.className = "btn btn-sm slot-btn";
+
+      if (isBusy) {
+        btn.classList.add("slot-busy");
+        btn.disabled = true;
+      } else {
+        btn.classList.add("slot-free");
+        btn.addEventListener("click", () => {
+          selectedSlotTime = time;
+          selectedStartInput.value = time;
+          selectedEndInput.value = nextHourStr(time);
+          document.querySelectorAll(".slot-btn").forEach(b => b.classList.remove("slot-selected"));
+          btn.classList.add("slot-selected");
+        });
+      }
+
+      slotsContainer.appendChild(btn);
+    }
+  }
+
+  prevDayBtn.addEventListener("click", () => {
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    const newDate = new Date(currentDate);
+    newDate.setDate(currentDate.getDate() - 1);
+    // İstersen geçmişe randevu alınmasın diye bugünden öncesini engelliyoruz
+    if (newDate < today) return;
+    currentDate = newDate;
+    renderDay();
+  });
+
+  nextDayBtn.addEventListener("click", () => {
+    const newDate = new Date(currentDate);
+    newDate.setDate(currentDate.getDate() + 1);
+    currentDate = newDate;
+    renderDay();
+  });
+
   // Form gönderimi
   const form = document.getElementById("appointmentForm");
   form.addEventListener("submit", function (e) {
@@ -259,20 +397,22 @@
     const data = {
       name: formData.get("name").trim(),
       contact: formData.get("contact").trim(),
-      date: formData.get("date"),
-      start_time: formData.get("start_time"),
-      end_time: formData.get("end_time"),
+      date: selectedDateInput.value,
+      start_time: selectedStartInput.value,
+      end_time: selectedEndInput.value,
       reason: formData.get("reason"),
       note: formData.get("note").trim()
     };
 
     if (!data.name || !data.date || !data.start_time || !data.end_time || !data.reason) {
-      showAlert("Lütfen zorunlu alanları doldurun.", "danger");
+      showAlert("Lütfen tüm zorunlu alanları ve bir saat dilimini seçin.", "danger");
       return;
     }
 
     addAppointment(data);
     form.reset();
+    // Seçili slot işareti kalsın istiyorsan burayı değiştirebilirsin
+    renderDay();
     showAlert("Randevu talebiniz alındı. Onaylandığında size haber verilecektir.", "success");
   });
 
@@ -331,6 +471,7 @@
         const id = parseInt(btn.getAttribute("data-id"));
         updateAppointmentStatus(id, "approved");
         renderAppointments(currentFilter);
+        renderDay(); // takvimde yeşile dönsün
       });
     });
     document.querySelectorAll(".reject-btn").forEach(btn => {
@@ -338,6 +479,7 @@
         const id = parseInt(btn.getAttribute("data-id"));
         updateAppointmentStatus(id, "rejected");
         renderAppointments(currentFilter);
+        renderDay();
       });
     });
   }
@@ -363,6 +505,9 @@
       renderAppointments(currentFilter);
     });
   });
+
+  // Sayfa yüklenince bugünden başla
+  renderDay();
 </script>
 
 </body>
