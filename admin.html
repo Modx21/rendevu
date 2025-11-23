@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <title>Admin Paneli - Mücahit Onur Diril Randevu Sistemi</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Bootstrap -->
+  <link
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+    rel="stylesheet"
+  >
+  <style>
+    body { background-color: #f5f5f5; }
+    .navbar-custom {
+      background-color: #020617;
+    }
+  </style>
+</head>
+<body>
+<nav class="navbar navbar-expand-lg navbar-dark navbar-custom mb-3">
+  <div class="container">
+    <a class="navbar-brand" href="index.html">Mücahit Onur Diril - Admin</a>
+  </div>
+</nav>
+
+<div class="container mb-5" id="adminContent">
+  <!-- İçerik JS ile doldurulacak -->
+</div>
+
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  const STORAGE_KEY = "randevu_kayitlari_v1";
+  const ADMIN_PASSWORD = "242935";
+
+  function loadAppointments() {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return [];
+    try {
+      return JSON.parse(raw);
+    } catch (e) {
+      console.error("JSON parse hatası", e);
+      return [];
+    }
+  }
+
+  function saveAppointments(list) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+  }
+
+  function updateAppointmentStatus(id, newStatus) {
+    const list = loadAppointments();
+    const idx = list.findIndex(item => item.id === id);
+    if (idx !== -1) {
+      list[idx].status = newStatus;
+      saveAppointments(list);
+    }
+  }
+
+  const adminContent = document.getElementById("adminContent");
+  let currentFilter = "all";
+
+  function renderAdminUI() {
+    const list = loadAppointments();
+
+    let filtered = list;
+    if (currentFilter !== "all") {
+      filtered = list.filter(a => a.status === currentFilter);
+    }
+
+    let html = `
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h1 class="h5 mb-0">Randevu Listesi</h1>
+          </div>
+
+          <div class="mb-3">
+            <span class="me-2">Filtre:</span>
+            <button class="btn btn-sm ${currentFilter === "pending" ? "btn-primary" : "btn-outline-primary"} me-1" data-filter="pending">Bekleyenler</button>
+            <button class="btn btn-sm ${currentFilter === "approved" ? "btn-success" : "btn-outline-success"} me-1" data-filter="approved">Onaylananlar</button>
+            <button class="btn btn-sm ${currentFilter === "rejected" ? "btn-danger" : "btn-outline-danger"} me-1" data-filter="rejected">Reddedilenler</button>
+            <button class="btn btn-sm ${currentFilter === "all" ? "btn-secondary" : "btn-outline-secondary"}" data-filter="all">Tümü</button>
+          </div>
+    `;
+
+    if (!filtered.length) {
+      html += `<p class="text-muted">Bu filtrede randevu kaydı bulunamadı.</p>`;
+    } else {
+      html += `
+        <div class="table-responsive">
+          <table class="table table-sm table-striped align-middle">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Tarih</th>
+                <th>Saat</th>
+                <th>Ad Soyad</th>
+                <th>İletişim</th>
+                <th>Neden</th>
+                <th>Not</th>
+                <th>Durum</th>
+                <th>İşlem</th>
+              </tr>
+            </thead>
+            <tbody>
+      `;
+
+      for (const a of filtered) {
+        let badgeClass = "bg-warning text-dark";
+        let badgeText = "Beklemede";
+        if (a.status === "approved") {
+          badgeClass = "bg-success";
+          badgeText = "Onaylandı";
+        } else if (a.status === "rejected") {
+          badgeClass = "bg-danger";
+          badgeText = "Reddedildi";
+        }
+
+        html += `
+          <tr>
+            <td>${a.id}</td>
+            <td>${a.date || ""}</td>
+            <td>${(a.start_time || "")} - ${(a.end_time || "")}</td>
+            <td>${a.name || ""}</td>
+            <td>${a.contact || ""}</td>
+            <td>${a.reason || ""}</td>
+            <td style="max-width:250px;">${a.note || ""}</td>
+            <td><span class="badge ${badgeClass}">${badgeText}</span></td>
+            <td>
+              <div class="d-flex gap-1">
+                ${a.status !== "approved" ? `<button class="btn btn-sm btn-success" data-action="approve" data-id="${a.id}">Onayla</button>` : ""}
+                ${a.status !== "rejected" ? `<button class="btn btn-sm btn-outline-danger" data-action="reject" data-id="${a.id}">Reddet</button>` : ""}
+              </div>
+            </td>
+          </tr>
+        `;
+      }
+
+      html += `
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    html += `
+        </div>
+      </div>
+    `;
+
+    adminContent.innerHTML = html;
+
+    // Filtre butonları
+    adminContent.querySelectorAll("button[data-filter]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        currentFilter = btn.getAttribute("data-filter");
+        renderAdminUI();
+      });
+    });
+
+    // Onay / Reddet butonları
+    adminContent.querySelectorAll("button[data-action]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const id = parseInt(btn.getAttribute("data-id"));
+        const action = btn.getAttribute("data-action");
+        const newStatus = action === "approve" ? "approved" : "rejected";
+        updateAppointmentStatus(id, newStatus);
+        renderAdminUI();
+      });
+    });
+  }
+
+  // Basit şifre kontrolü
+  const pass = prompt("Admin şifresini giriniz:");
+  if (pass === ADMIN_PASSWORD) {
+    renderAdminUI();
+  } else {
+    adminContent.innerHTML = `
+      <div class="alert alert-danger mt-3">
+        Yetkisiz erişim. Yanlış şifre girdiniz.
+      </div>
+    `;
+  }
+</script>
+
+</body>
+</html>
